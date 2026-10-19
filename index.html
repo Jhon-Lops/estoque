@@ -99,6 +99,17 @@
           <input id="categoria" maxlength="60"
             placeholder="Ex.: Ferramentas">
 
+          <label for="unidade">Tipo de volume *</label>
+          <select id="unidade" required>
+            <option value="und">Unidade (und)</option>
+            <option value="kg">Quilograma (kg)</option>
+            <option value="g">Grama (g)</option>
+            <option value="L">Litro (L)</option>
+            <option value="mL">Mililitro (mL)</option>
+            <option value="cx">Caixa (cx)</option>
+            <option value="kl">Quilolitro (kL)</option>
+          </select>
+
           <label for="quantidade">Quantidade inicial *</label>
           <input id="quantidade" type="number"
             min="0" step="1" value="0" required>

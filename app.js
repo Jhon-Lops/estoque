@@ -116,6 +116,7 @@ async function carregarDadosOnline() {
     id: produto.id,
     nome: produto.nome,
     categoria: produto.categoria,
+    unidade: produto.unidade || "und",
     quantidade: produto.quantidade,
     minimo: produto.minimo
   }));
@@ -192,11 +193,13 @@ porId("formProduto").addEventListener("submit", async evento => {
 
   const nome = porId("nome").value.trim();
   const categoria = porId("categoria").value.trim();
+  const unidade = porId("unidade").value;
   const quantidade = Number(porId("quantidade").value);
   const minimo = Number(porId("minimo").value);
 
   if (
     !nome ||
+    !unidade ||
     !Number.isSafeInteger(quantidade) ||
     quantidade < 0 ||
     !Number.isSafeInteger(minimo) ||
@@ -211,6 +214,7 @@ porId("formProduto").addEventListener("submit", async evento => {
     id: crypto.randomUUID(),
     nome,
     categoria,
+    unidade,
     quantidade,
     minimo
   };
@@ -220,6 +224,7 @@ porId("formProduto").addEventListener("submit", async evento => {
     .insert({
       nome,
       categoria,
+      unidade,
       quantidade,
       minimo,
       criado_por: usuarioAtual.id
@@ -381,6 +386,50 @@ porId("listaProdutos").addEventListener("click", async evento => {
     return;
   }
 
+  const botaoQuantidade = evento.target.closest("[data-editar-quantidade]");
+  if (botaoQuantidade) {
+    const produto = produtos.find(item => item.id === botaoQuantidade.dataset.editarQuantidade);
+    if (!produto) return;
+
+    const valor = prompt(
+      `Quantidade atual de "${produto.nome}" (${produto.unidade}):`,
+      String(produto.quantidade)
+    );
+    if (valor === null) return;
+
+    const quantidade = Number(valor);
+    if (!Number.isSafeInteger(quantidade) || quantidade < 0) {
+      alert("Informe um número inteiro maior ou igual a zero.");
+      return;
+    }
+
+    const quantidadeAnterior = produto.quantidade;
+    const { error } = await clienteSupabase
+      .from("produtos")
+      .update({ quantidade })
+      .eq("id", produto.id);
+
+    if (error) {
+      alert(`Não foi possível alterar a quantidade: ${error.message}`);
+      return;
+    }
+
+    try {
+      await registrarAuditoria(
+        "editar",
+        "produtos",
+        produto.id,
+        `${perfilAtual.nickname} alterou a quantidade de "${produto.nome}" de ${quantidadeAnterior} para ${quantidade} ${produto.unidade}.`
+      );
+    } catch (erro) {
+      alert(`Quantidade alterada, mas a auditoria falhou: ${erro.message}`);
+    }
+
+    await carregarDadosOnline();
+    atualizarTela();
+    return;
+  }
+
   const botao = evento.target.closest("[data-excluir]");
   if (!botao) return;
 
@@ -484,7 +533,10 @@ function atualizarProdutos() {
         <strong>${escapar(p.nome)}</strong>
         <span class="selo ${classeEstado(p)}">${estadoProduto(p)}</span>
         <small>Categoria: ${escapar(p.categoria || "Sem categoria")}</small>
-        <small>Saldo: ${p.quantidade} · Estoque mínimo: ${p.minimo}</small>
+        <small>Saldo: ${p.quantidade} ${escapar(p.unidade)} · Estoque mínimo: ${p.minimo} ${escapar(p.unidade)}</small>
+        <button type="button" class="botao-editar" data-editar-quantidade="${escapar(p.id)}">
+          Editar quantidade
+        </button>
         <button type="button" class="botao-editar" data-editar-minimo="${escapar(p.id)}">
           Editar quantidade mínima
         </button>
