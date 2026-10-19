@@ -34,8 +34,13 @@ async function iniciarAutenticacao() {
   if (session?.user) await prepararSessao(session.user);
 
   clienteSupabase.auth.onAuthStateChange((_evento, novaSessao) => {
-    if (novaSessao?.user) prepararSessao(novaSessao.user);
-    else mostrarLogin();
+    if (novaSessao?.user) {
+      prepararSessao(novaSessao.user).catch(erro => {
+        porId("mensagemLogin").textContent = erro.message;
+      });
+    } else {
+      mostrarLogin();
+    }
   });
 }
 
@@ -62,24 +67,33 @@ porId("formLogin").addEventListener("submit", async evento => {
   const senha = porId("senhaLogin").value;
   const nickname = porId("nicknameLogin").value.trim();
   const mensagem = porId("mensagemLogin");
+  const botao = porId("botaoLogin");
   mensagem.textContent = "Aguarde...";
+  botao.disabled = true;
 
-  const resultado = modoCadastro
-    ? await clienteSupabase.auth.signUp({
-        email,
-        password: senha,
-        options: { data: { nickname, role: "user" } }
-      })
-    : await clienteSupabase.auth.signInWithPassword({ email, password: senha });
+  try {
+    const resultado = modoCadastro
+      ? await clienteSupabase.auth.signUp({
+          email,
+          password: senha,
+          options: { data: { nickname, role: "user" } }
+        })
+      : await clienteSupabase.auth.signInWithPassword({ email, password: senha });
 
-  if (resultado.error) {
-    mensagem.textContent = resultado.error.message;
-    return;
+    if (resultado.error) {
+      mensagem.textContent = resultado.error.message;
+      return;
+    }
+
+    mensagem.textContent = modoCadastro
+      ? "Conta criada. Verifique seu e-mail para confirmar o acesso."
+      : "Login realizado. Carregando...";
+  } catch (erro) {
+    mensagem.textContent =
+      `Não foi possível concluir o acesso: ${erro.message || "verifique sua conexão."}`;
+  } finally {
+    botao.disabled = false;
   }
-
-  mensagem.textContent = modoCadastro
-    ? "Conta criada. Verifique seu e-mail para confirmar o acesso."
-    : "";
 });
 
 porId("alternarCadastro").addEventListener("click", () => {
