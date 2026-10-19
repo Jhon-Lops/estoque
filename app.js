@@ -1,9 +1,88 @@
 
+const SUPABASE_URL = "https://lgglxgdcrbmrhfradszk.supabase.co";
+const SUPABASE_CHAVE_PUBLICA = "sb_publishable_tJ-SqQkXS0Wtk1-rkWZQeQ_iRZsJZkh";
+const clienteSupabase = window.supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_CHAVE_PUBLICA
+);
+
 const CHAVE_PRODUTOS = "meuEstoque_produtos_v1";
 const CHAVE_HISTORICO = "meuEstoque_historico_v1";
 
 let produtos = carregar(CHAVE_PRODUTOS);
 let historico = carregar(CHAVE_HISTORICO);
+let modoCadastro = false;
+
+const porId = id => document.getElementById(id);
+
+function mostrarAplicacao(usuario) {
+  porId("login").classList.add("escondida");
+  porId("aplicacao").classList.remove("escondida");
+  const nickname = usuario.user_metadata?.nickname || usuario.email;
+  porId("usuarioLogado").textContent =
+    `${nickname} (${usuario.user_metadata?.role === "admin" ? "Administrador" : "Usuário"})`;
+  atualizarTela();
+}
+
+function mostrarLogin() {
+  porId("login").classList.remove("escondida");
+  porId("aplicacao").classList.add("escondida");
+}
+
+async function iniciarAutenticacao() {
+  const { data: { session } } = await clienteSupabase.auth.getSession();
+  if (session?.user) mostrarAplicacao(session.user);
+
+  clienteSupabase.auth.onAuthStateChange((_evento, novaSessao) => {
+    if (novaSessao?.user) mostrarAplicacao(novaSessao.user);
+    else mostrarLogin();
+  });
+}
+
+porId("formLogin").addEventListener("submit", async evento => {
+  evento.preventDefault();
+  const email = porId("emailLogin").value.trim();
+  const senha = porId("senhaLogin").value;
+  const nickname = porId("nicknameLogin").value.trim();
+  const mensagem = porId("mensagemLogin");
+  mensagem.textContent = "Aguarde...";
+
+  const resultado = modoCadastro
+    ? await clienteSupabase.auth.signUp({
+        email,
+        password: senha,
+        options: { data: { nickname, role: "user" } }
+      })
+    : await clienteSupabase.auth.signInWithPassword({ email, password: senha });
+
+  if (resultado.error) {
+    mensagem.textContent = resultado.error.message;
+    return;
+  }
+
+  mensagem.textContent = modoCadastro
+    ? "Conta criada. Verifique seu e-mail para confirmar o acesso."
+    : "";
+});
+
+porId("alternarCadastro").addEventListener("click", () => {
+  modoCadastro = !modoCadastro;
+  porId("textoLogin").textContent = modoCadastro
+    ? "Crie sua conta para acessar o estoque."
+    : "Entre para acessar o estoque.";
+  porId("botaoLogin").textContent = modoCadastro ? "Criar conta" : "Entrar";
+  porId("alternarCadastro").textContent = modoCadastro
+    ? "Já tenho uma conta"
+    : "Criar uma conta";
+  porId("labelNickname").classList.toggle("escondida", !modoCadastro);
+  porId("nicknameLogin").classList.toggle("escondida", !modoCadastro);
+  porId("nicknameLogin").required = modoCadastro;
+});
+
+porId("botaoSair").addEventListener("click", async () => {
+  const { error } = await clienteSupabase.auth.signOut();
+  if (error) porId("mensagemLogin").textContent = error.message;
+});
 
 function carregar(chave) {
   try {
@@ -24,8 +103,6 @@ function salvarDados() {
     return false;
   }
 }
-
-const porId = id => document.getElementById(id);
 
 function escapar(texto) {
   return String(texto).replace(/[&<>"']/g, caractere => ({
@@ -289,4 +366,7 @@ function atualizarHistorico() {
 }
 
 // Recupera os dados ao abrir ou recarregar a página
-atualizarTela();
+iniciarAutenticacao().catch(erro => {
+  porId("mensagemLogin").textContent =
+    `Não foi possível iniciar o login: ${erro.message}`;
+});

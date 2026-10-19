@@ -20,6 +20,56 @@ body {
   color: var(--texto);
 }
 
+.login-pagina {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.login-cartao {
+  width: min(100%, 420px);
+  background: white;
+  border: 1px solid var(--borda);
+  border-radius: 12px;
+  padding: 28px;
+  box-shadow: 0 8px 24px #14243a14;
+}
+
+.login-cartao h1 {
+  margin-top: 0;
+  color: var(--azul);
+}
+
+.login-cartao > p {
+  color: #64748b;
+}
+
+.mensagem {
+  min-height: 20px;
+  color: var(--vermelho);
+}
+
+.botao-secundario {
+  margin-top: 10px;
+  background: transparent;
+  color: #2457b2;
+  border: 1px solid var(--borda);
+}
+
+.usuario-logado {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.usuario-logado button {
+  width: auto;
+  padding: 8px 12px;
+  background: transparent;
+  border: 1px solid #ffffff66;
+}
+
 .topo {
   background: var(--azul);
   color: white;

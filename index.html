@@ -7,26 +7,56 @@
   <meta name="theme-color" content="#14243a">
   <title>Controle de Estoque</title>
   <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="app.js" defer></script>
 </head>
 <body>
-  <header class="topo">
+  <section id="login" class="login-pagina">
+    <div class="login-cartao">
+      <h1>Meu Estoque</h1>
+      <p id="textoLogin">Entre para acessar o estoque.</p>
+      <form id="formLogin">
+        <label for="emailLogin">E-mail</label>
+        <input id="emailLogin" type="email" autocomplete="email" required>
+
+        <label for="senhaLogin">Senha</label>
+        <input id="senhaLogin" type="password" autocomplete="current-password"
+          minlength="6" required>
+
+        <label id="labelNickname" class="escondida" for="nicknameLogin">Nickname</label>
+        <input id="nicknameLogin" class="escondida" maxlength="40"
+          autocomplete="nickname" placeholder="Como seu nome aparecerá no histórico">
+
+        <button id="botaoLogin" type="submit">Entrar</button>
+      </form>
+      <button id="alternarCadastro" class="botao-secundario" type="button">
+        Criar uma conta
+      </button>
+      <p id="mensagemLogin" class="mensagem" role="status"></p>
+    </div>
+  </section>
+
+  <div id="aplicacao" class="escondida">
+    <header class="topo">
     <div>
       <h1>Meu Estoque</h1>
       <p>Controle de produtos e movimentações</p>
     </div>
-    <span class="status">● Offline disponível</span>
-  </header>
+    <div class="usuario-logado">
+      <span id="usuarioLogado"></span>
+      <button id="botaoSair" type="button">Sair</button>
+    </div>
+    </header>
 
-  <nav class="menu">
+    <nav class="menu">
     <button data-aba="dashboard" class="ativo">Dashboard</button>
     <button data-aba="cadastro">Cadastrar item</button>
     <button data-aba="movimentacao">Entrada / Saída</button>
     <button data-aba="produtos">Estoque</button>
     <button data-aba="historico">Histórico</button>
-  </nav>
+    </nav>
 
-  <main>
+    <main>
     <section id="dashboard" class="aba">
       <h2>Dashboard</h2>
       <p class="subtitulo">Resumo atualizado do seu estoque.</p>
@@ -128,10 +158,11 @@
         <div id="listaHistorico"></div>
       </div>
     </section>
-  </main>
+    </main>
 
-  <footer>
-    <p>Meu Estoque · Dados salvos neste dispositivo</p>
-  </footer>
+    <footer>
+      <p>Meu Estoque · Acesso protegido por login</p>
+    </footer>
+  </div>
 </body>
 </html>
