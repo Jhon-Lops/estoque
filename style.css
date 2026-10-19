@@ -228,6 +228,15 @@ button:hover {
   color: #991b1b;
 }
 
+.botao-editar {
+  width: auto;
+  margin-top: 10px;
+  margin-right: 8px;
+  padding: 8px 12px;
+  background: var(--azul-claro);
+  color: #2457b2;
+}
+
 .item,
 .movimento {
   padding: 14px 0;

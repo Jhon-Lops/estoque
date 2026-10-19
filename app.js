@@ -337,6 +337,50 @@ porId("formMovimentacao").addEventListener("submit", async evento => {
 porId("pesquisa").addEventListener("input", atualizarProdutos);
 
 porId("listaProdutos").addEventListener("click", async evento => {
+  const botaoEditar = evento.target.closest("[data-editar-minimo]");
+  if (botaoEditar) {
+    const produto = produtos.find(item => item.id === botaoEditar.dataset.editarMinimo);
+    if (!produto) return;
+
+    const valor = prompt(
+      `Quantidade mínima para "${produto.nome}":`,
+      String(produto.minimo)
+    );
+    if (valor === null) return;
+
+    const minimo = Number(valor);
+    if (!Number.isSafeInteger(minimo) || minimo < 0) {
+      alert("Informe um número inteiro maior ou igual a zero.");
+      return;
+    }
+
+    const minimoAnterior = produto.minimo;
+    const { error } = await clienteSupabase
+      .from("produtos")
+      .update({ minimo })
+      .eq("id", produto.id);
+
+    if (error) {
+      alert(`Não foi possível alterar a quantidade mínima: ${error.message}`);
+      return;
+    }
+
+    try {
+      await registrarAuditoria(
+        "editar",
+        "produtos",
+        produto.id,
+        `${perfilAtual.nickname} alterou o mínimo de "${produto.nome}" de ${minimoAnterior} para ${minimo}.`
+      );
+    } catch (erro) {
+      alert(`Quantidade mínima alterada, mas a auditoria falhou: ${erro.message}`);
+    }
+
+    await carregarDadosOnline();
+    atualizarTela();
+    return;
+  }
+
   const botao = evento.target.closest("[data-excluir]");
   if (!botao) return;
 
@@ -441,6 +485,9 @@ function atualizarProdutos() {
         <span class="selo ${classeEstado(p)}">${estadoProduto(p)}</span>
         <small>Categoria: ${escapar(p.categoria || "Sem categoria")}</small>
         <small>Saldo: ${p.quantidade} · Estoque mínimo: ${p.minimo}</small>
+        <button type="button" class="botao-editar" data-editar-minimo="${escapar(p.id)}">
+          Editar quantidade mínima
+        </button>
         <button type="button" class="botao-excluir" data-excluir="${escapar(p.id)}">
           Excluir
         </button>
