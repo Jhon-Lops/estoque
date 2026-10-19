@@ -105,7 +105,7 @@ async function carregarDadosOnline() {
   const [produtosResultado, historicoResultado] = await Promise.all([
     clienteSupabase.from("produtos").select("*").order("criado_em", { ascending: false }),
     clienteSupabase.from("movimentacoes")
-      .select("id, produto_id, tipo, quantidade, observacao, realizado_em, profiles(nickname)")
+      .select("id, produto_id, tipo, quantidade, observacao, realizado_em, realizado_por")
       .order("realizado_em", { ascending: false })
   ]);
 
@@ -121,6 +121,22 @@ async function carregarDadosOnline() {
     minimo: produto.minimo
   }));
 
+  const idsUsuarios = [...new Set(
+    historicoResultado.data.map(movimento => movimento.realizado_por)
+  )];
+  const perfisResultado = idsUsuarios.length
+    ? await clienteSupabase
+      .from("profiles")
+      .select("id, nickname")
+      .in("id", idsUsuarios)
+    : { data: [], error: null };
+
+  if (perfisResultado.error) throw perfisResultado.error;
+
+  const nicknames = new Map(
+    perfisResultado.data.map(perfil => [perfil.id, perfil.nickname])
+  );
+
   historico = historicoResultado.data.map(movimento => ({
     id: movimento.id,
     produtoId: movimento.produto_id,
@@ -129,7 +145,7 @@ async function carregarDadosOnline() {
     quantidade: movimento.quantidade,
     observacao: movimento.observacao,
     data: movimento.realizado_em,
-    nickname: movimento.profiles?.nickname || "Usuário"
+    nickname: nicknames.get(movimento.realizado_por) || "Usuário"
   }));
 }
 
@@ -235,6 +251,28 @@ porId("formProduto").addEventListener("submit", async evento => {
   if (error) {
     porId("mensagemProduto").textContent = `Não foi possível salvar: ${error.message}`;
     return;
+  }
+
+  if (quantidade > 0) {
+    const { error: movimentoErro } = await clienteSupabase
+      .from("movimentacoes")
+      .insert({
+        produto_id: produtoSalvo.id,
+        tipo: "entrada",
+        quantidade,
+        observacao: "Estoque inicial",
+        realizado_por: usuarioAtual.id
+      });
+
+    if (movimentoErro) {
+      await clienteSupabase
+        .from("produtos")
+        .delete()
+        .eq("id", produtoSalvo.id);
+      porId("mensagemProduto").textContent =
+        `Produto não foi salvo porque o histórico falhou: ${movimentoErro.message}`;
+      return;
+    }
   }
 
   try {
