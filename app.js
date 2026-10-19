@@ -110,6 +110,31 @@ porId("alternarCadastro").addEventListener("click", () => {
   porId("nicknameLogin").required = modoCadastro;
 });
 
+porId("recuperarSenha").addEventListener("click", async () => {
+  const email = porId("emailLogin").value.trim();
+  const mensagem = porId("mensagemLogin");
+
+  if (!email) {
+    mensagem.textContent = "Informe seu e-mail antes de recuperar a senha.";
+    porId("emailLogin").focus();
+    return;
+  }
+
+  mensagem.textContent = "Enviando instruções...";
+  try {
+    const { error } = await clienteSupabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}${window.location.pathname}`
+    });
+
+    mensagem.textContent = error
+      ? `Não foi possível enviar o e-mail: ${error.message}`
+      : "Verifique seu e-mail para redefinir a senha.";
+  } catch (erro) {
+    mensagem.textContent =
+      `Não foi possível enviar o e-mail: ${erro.message || "tente novamente."}`;
+  }
+});
+
 porId("botaoSair").addEventListener("click", async () => {
   const { error } = await clienteSupabase.auth.signOut();
   if (error) porId("mensagemLogin").textContent = error.message;
