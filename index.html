@@ -1,0 +1,137 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#14243a">
+  <title>Controle de Estoque</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="topo">
+    <div>
+      <h1>Meu Estoque</h1>
+      <p>Controle de produtos e movimentações</p>
+    </div>
+    <span class="status">● Offline disponível</span>
+  </header>
+
+  <nav class="menu">
+    <button data-aba="dashboard" class="ativo">Dashboard</button>
+    <button data-aba="cadastro">Cadastrar item</button>
+    <button data-aba="movimentacao">Entrada / Saída</button>
+    <button data-aba="produtos">Estoque</button>
+    <button data-aba="historico">Histórico</button>
+  </nav>
+
+  <main>
+    <section id="dashboard" class="aba">
+      <h2>Dashboard</h2>
+      <p class="subtitulo">Resumo atualizado do seu estoque.</p>
+
+      <div class="indicadores">
+        <article class="cartao">
+          <span>Produtos cadastrados</span>
+          <strong id="totalProdutos">0</strong>
+        </article>
+        <article class="cartao">
+          <span>Unidades em estoque</span>
+          <strong id="totalUnidades">0</strong>
+        </article>
+        <article class="cartao alerta">
+          <span>Estoque baixo</span>
+          <strong id="totalBaixo">0</strong>
+        </article>
+        <article class="cartao perigo">
+          <span>Produtos esgotados</span>
+          <strong id="totalZerado">0</strong>
+        </article>
+      </div>
+
+      <div class="painel">
+        <h3>⚠️ Produtos que precisam de atenção</h3>
+        <div id="alertas"></div>
+      </div>
+    </section>
+
+    <section id="cadastro" class="aba escondida">
+      <div class="painel">
+        <h2>Cadastrar item</h2>
+
+        <form id="formProduto">
+          <label for="nome">Nome do produto *</label>
+          <input id="nome" required maxlength="100"
+            placeholder="Ex.: Parafuso">
+
+          <label for="categoria">Categoria</label>
+          <input id="categoria" maxlength="60"
+            placeholder="Ex.: Ferramentas">
+
+          <label for="quantidade">Quantidade inicial *</label>
+          <input id="quantidade" type="number"
+            min="0" step="1" value="0" required>
+
+          <label for="minimo">Quantidade mínima *</label>
+          <input id="minimo" type="number"
+            min="0" step="1" value="5" required>
+
+          <button type="submit">Salvar produto</button>
+        </form>
+        <p id="mensagemProduto" role="status"></p>
+      </div>
+    </section>
+
+    <section id="movimentacao" class="aba escondida">
+      <div class="painel">
+        <h2>Entrada ou saída</h2>
+
+        <form id="formMovimentacao">
+          <label for="produtoMov">Produto *</label>
+          <select id="produtoMov" required>
+            <option value="">Selecione um produto</option>
+          </select>
+
+          <label for="tipoMov">Tipo de movimentação *</label>
+          <select id="tipoMov" required>
+            <option value="entrada">Entrada de mercadoria</option>
+            <option value="saida">Saída de mercadoria</option>
+          </select>
+
+          <label for="qtdMov">Quantidade *</label>
+          <input id="qtdMov" type="number"
+            min="1" step="1" required placeholder="Ex.: 3">
+
+          <label for="obsMov">Observação</label>
+          <input id="obsMov" maxlength="200"
+            placeholder="Ex.: Venda ou reposição">
+
+          <button type="submit">Registrar movimentação</button>
+        </form>
+        <p id="mensagemMov" role="status"></p>
+      </div>
+    </section>
+
+    <section id="produtos" class="aba escondida">
+      <div class="painel">
+        <h2>Estoque atual</h2>
+        <input id="pesquisa" type="search"
+          placeholder="Pesquisar produto...">
+        <div id="listaProdutos"></div>
+      </div>
+    </section>
+
+    <section id="historico" class="aba escondida">
+      <div class="painel">
+        <h2>Histórico de movimentações</h2>
+        <div id="listaHistorico"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>Meu Estoque · Dados salvos neste dispositivo</p>
+  </footer>
+</body>
+</html>
