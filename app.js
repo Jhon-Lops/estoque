@@ -6,22 +6,22 @@ const clienteSupabase = window.supabase.createClient(
   SUPABASE_CHAVE_PUBLICA
 );
 
-const CHAVE_PRODUTOS = "meuEstoque_produtos_v1";
-const CHAVE_HISTORICO = "meuEstoque_historico_v1";
-
-let produtos = carregar(CHAVE_PRODUTOS);
-let historico = carregar(CHAVE_HISTORICO);
 let modoCadastro = false;
+let produtos = [];
+let historico = [];
+let perfilAtual = null;
+let usuarioAtual = null;
 
 const porId = id => document.getElementById(id);
 
-function mostrarAplicacao(usuario) {
+function mostrarAplicacao(usuario, perfil) {
+  usuarioAtual = usuario;
+  perfilAtual = perfil;
   porId("login").classList.add("escondida");
   porId("aplicacao").classList.remove("escondida");
-  const nickname = usuario.user_metadata?.nickname || usuario.email;
+  const nickname = perfil.nickname || usuario.email;
   porId("usuarioLogado").textContent =
-    `${nickname} (${usuario.user_metadata?.role === "admin" ? "Administrador" : "Usuário"})`;
-  atualizarTela();
+    `${nickname} (${perfil.role === "admin" ? "Administrador" : "Usuário"})`;
 }
 
 function mostrarLogin() {
@@ -31,12 +31,29 @@ function mostrarLogin() {
 
 async function iniciarAutenticacao() {
   const { data: { session } } = await clienteSupabase.auth.getSession();
-  if (session?.user) mostrarAplicacao(session.user);
+  if (session?.user) await prepararSessao(session.user);
 
   clienteSupabase.auth.onAuthStateChange((_evento, novaSessao) => {
-    if (novaSessao?.user) mostrarAplicacao(novaSessao.user);
+    if (novaSessao?.user) prepararSessao(novaSessao.user);
     else mostrarLogin();
   });
+}
+
+async function prepararSessao(usuario) {
+  const { data: perfil, error } = await clienteSupabase
+    .from("profiles")
+    .select("id, nickname, role, autorizado")
+    .eq("id", usuario.id)
+    .single();
+
+  if (error || !perfil?.autorizado) {
+    await clienteSupabase.auth.signOut();
+    throw new Error("Sua conta ainda não foi autorizada pelo administrador.");
+  }
+
+  mostrarAplicacao(usuario, perfil);
+  await carregarDadosOnline();
+  atualizarTela();
 }
 
 porId("formLogin").addEventListener("submit", async evento => {
@@ -84,24 +101,46 @@ porId("botaoSair").addEventListener("click", async () => {
   if (error) porId("mensagemLogin").textContent = error.message;
 });
 
-function carregar(chave) {
-  try {
-    const dados = JSON.parse(localStorage.getItem(chave) || "[]");
-    return Array.isArray(dados) ? dados : [];
-  } catch {
-    return [];
-  }
+async function carregarDadosOnline() {
+  const [produtosResultado, historicoResultado] = await Promise.all([
+    clienteSupabase.from("produtos").select("*").order("criado_em", { ascending: false }),
+    clienteSupabase.from("movimentacoes")
+      .select("id, produto_id, tipo, quantidade, observacao, realizado_em, profiles(nickname)")
+      .order("realizado_em", { ascending: false })
+  ]);
+
+  if (produtosResultado.error) throw produtosResultado.error;
+  if (historicoResultado.error) throw historicoResultado.error;
+
+  produtos = produtosResultado.data.map(produto => ({
+    id: produto.id,
+    nome: produto.nome,
+    categoria: produto.categoria,
+    quantidade: produto.quantidade,
+    minimo: produto.minimo
+  }));
+
+  historico = historicoResultado.data.map(movimento => ({
+    id: movimento.id,
+    produtoId: movimento.produto_id,
+    nome: produtos.find(p => p.id === movimento.produto_id)?.nome || "Produto removido",
+    tipo: movimento.tipo,
+    quantidade: movimento.quantidade,
+    observacao: movimento.observacao,
+    data: movimento.realizado_em,
+    nickname: movimento.profiles?.nickname || "Usuário"
+  }));
 }
 
-function salvarDados() {
-  try {
-    localStorage.setItem(CHAVE_PRODUTOS, JSON.stringify(produtos));
-    localStorage.setItem(CHAVE_HISTORICO, JSON.stringify(historico));
-    return true;
-  } catch (erro) {
-    alert("Não foi possível salvar. Verifique o espaço disponível.");
-    return false;
-  }
+async function registrarAuditoria(acao, tabela, registroId, descricao) {
+  const { error } = await clienteSupabase.from("auditoria").insert({
+    usuario_id: usuarioAtual.id,
+    acao,
+    tabela_afetada: tabela,
+    registro_id: registroId,
+    descricao
+  });
+  if (error) throw error;
 }
 
 function escapar(texto) {
@@ -148,7 +187,7 @@ document.querySelectorAll("[data-aba]").forEach(botao => {
 });
 
 // Cadastro de produto
-porId("formProduto").addEventListener("submit", evento => {
+porId("formProduto").addEventListener("submit", async evento => {
   evento.preventDefault();
 
   const nome = porId("nome").value.trim();
@@ -176,31 +215,33 @@ porId("formProduto").addEventListener("submit", evento => {
     minimo
   };
 
-  const anterior = produtos;
-  produtos = [...produtos, produto];
+  const { data: produtoSalvo, error } = await clienteSupabase
+    .from("produtos")
+    .insert({
+      nome,
+      categoria,
+      quantidade,
+      minimo,
+      criado_por: usuarioAtual.id
+    })
+    .select()
+    .single();
 
-  if (!salvarDados()) {
-    produtos = anterior;
+  if (error) {
+    porId("mensagemProduto").textContent = `Não foi possível salvar: ${error.message}`;
     return;
   }
 
-  if (quantidade > 0) {
-    historico.unshift({
-      id: crypto.randomUUID(),
-      produtoId: produto.id,
-      nome: produto.nome,
-      tipo: "entrada",
-      quantidade,
-      observacao: "Estoque inicial",
-      data: new Date().toISOString()
-    });
-
-    if (!salvarDados()) {
-      historico.shift();
-      produtos = anterior;
-      salvarDados();
-      return;
-    }
+  try {
+    await registrarAuditoria(
+      "cadastrar",
+      "produtos",
+      produtoSalvo.id,
+      `${perfilAtual.nickname} cadastrou "${nome}".`
+    );
+  } catch (erro) {
+    porId("mensagemProduto").textContent =
+      `Produto salvo, mas a auditoria falhou: ${erro.message}`;
   }
 
   porId("formProduto").reset();
@@ -208,11 +249,12 @@ porId("formProduto").addEventListener("submit", evento => {
   porId("minimo").value = 5;
   porId("mensagemProduto").textContent = "Produto salvo com sucesso!";
 
+  await carregarDadosOnline();
   atualizarTela();
 });
 
 // Entrada e saída de mercadorias
-porId("formMovimentacao").addEventListener("submit", evento => {
+porId("formMovimentacao").addEventListener("submit", async evento => {
   evento.preventDefault();
 
   const produtoId = porId("produtoMov").value;
@@ -239,36 +281,92 @@ porId("formMovimentacao").addEventListener("submit", evento => {
     return;
   }
 
-  const saldoAnterior = produto.quantidade;
-  const historicoAnterior = historico;
+  const novoSaldo = produto.quantidade + (tipo === "entrada" ? quantidade : -quantidade);
+  const { error: produtoErro } = await clienteSupabase
+    .from("produtos")
+    .update({ quantidade: novoSaldo })
+    .eq("id", produto.id);
 
-  produto.quantidade += tipo === "entrada" ? quantidade : -quantidade;
-
-  historico = [{
-    id: crypto.randomUUID(),
-    produtoId: produto.id,
-    nome: produto.nome,
-    tipo,
-    quantidade,
-    observacao,
-    data: new Date().toISOString()
-  }, ...historico];
-
-  if (!salvarDados()) {
-    produto.quantidade = saldoAnterior;
-    historico = historicoAnterior;
+  if (produtoErro) {
+    porId("mensagemMov").textContent =
+      `Não foi possível atualizar o saldo: ${produtoErro.message}`;
     return;
+  }
+
+  const { error: movimentoErro } = await clienteSupabase
+    .from("movimentacoes")
+    .insert({
+      produto_id: produto.id,
+      tipo,
+      quantidade,
+      observacao,
+      realizado_por: usuarioAtual.id
+    });
+
+  if (movimentoErro) {
+    await clienteSupabase
+      .from("produtos")
+      .update({ quantidade: produto.quantidade })
+      .eq("id", produto.id);
+    porId("mensagemMov").textContent =
+      `Saldo revertido porque o histórico falhou: ${movimentoErro.message}`;
+    return;
+  }
+
+  try {
+    await registrarAuditoria(
+      "movimentar",
+      "movimentacoes",
+      produto.id,
+      `${perfilAtual.nickname} registrou ${tipo} de ${quantidade} em "${produto.nome}".`
+    );
+  } catch (erro) {
+    porId("mensagemMov").textContent =
+      `Movimentação salva, mas a auditoria falhou: ${erro.message}`;
   }
 
   porId("formMovimentacao").reset();
   porId("mensagemMov").textContent =
-    `Movimentação registrada! Saldo atual: ${produto.quantidade}.`;
+    `Movimentação registrada! Saldo atual: ${novoSaldo}.`;
 
+  await carregarDadosOnline();
   atualizarTela();
 });
 
 // Pesquisa de produtos
 porId("pesquisa").addEventListener("input", atualizarProdutos);
+
+porId("listaProdutos").addEventListener("click", async evento => {
+  const botao = evento.target.closest("[data-excluir]");
+  if (!botao) return;
+
+  const produto = produtos.find(item => item.id === botao.dataset.excluir);
+  if (!produto || !confirm(`Excluir "${produto.nome}"?`)) return;
+
+  const { error } = await clienteSupabase
+    .from("produtos")
+    .delete()
+    .eq("id", produto.id);
+
+  if (error) {
+    alert(`Não foi possível excluir: ${error.message}`);
+    return;
+  }
+
+  try {
+    await registrarAuditoria(
+      "excluir",
+      "produtos",
+      produto.id,
+      `${perfilAtual.nickname} excluiu "${produto.nome}".`
+    );
+  } catch (erro) {
+    alert(`Produto excluído, mas a auditoria falhou: ${erro.message}`);
+  }
+
+  await carregarDadosOnline();
+  atualizarTela();
+});
 
 function atualizarTela() {
   porId("totalProdutos").textContent = produtos.length;
@@ -343,6 +441,9 @@ function atualizarProdutos() {
         <span class="selo ${classeEstado(p)}">${estadoProduto(p)}</span>
         <small>Categoria: ${escapar(p.categoria || "Sem categoria")}</small>
         <small>Saldo: ${p.quantidade} · Estoque mínimo: ${p.minimo}</small>
+        <button type="button" class="botao-excluir" data-excluir="${escapar(p.id)}">
+          Excluir
+        </button>
       </div>
     `).join("")
     : '<p class="vazio">Nenhum produto encontrado.</p>';
@@ -358,7 +459,7 @@ function atualizarHistorico() {
         <span class="selo ${m.tipo === "entrada" ? "verde" : "vermelho"}">
           ${m.tipo === "entrada" ? "ENTRADA" : "SAÍDA"}: ${m.quantidade}
         </span>
-        <small>${formatarData(m.data)}</small>
+        <small>${formatarData(m.data)} · Por: ${escapar(m.nickname)}</small>
         <small>${escapar(m.observacao || "Sem observação")}</small>
       </div>
     `).join("")
